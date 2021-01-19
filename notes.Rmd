@@ -1,0 +1,178 @@
+# The Fortuin-Kastelyn Representation
+
+Consider a classical Ising Model of $N$ spins:
+
+$$H = - \sum_{i,j} J_{ij}\sigma_i\sigma_j$$
+
+where $\sigma_i = \pm 1$, and $J$ is a strictly upper triangular matrix. From
+here on, we will assume that the interactions are ferromagnetic ($J_{ij} \geq 0$).
+
+The partition function is:
+
+$$
+\begin{aligned}
+    Z &= \sum_{\mathbf{\sigma}}\left\lbrack \exp\left(\beta \sum_{i,j} J_{ij} \sigma_i \sigma_j\right)\right\rbrack \\
+      &= \sum_{\mathbf{\sigma}}\left\lbrack \prod_{i,j} \exp(\beta J_{ij} \sigma_i \sigma_j)\right\rbrack \\
+\end{aligned}
+$$
+
+We note that each factor in the product can only take one of two forms:
+
+$$
+\begin{aligned}
+\exp\left(\beta J_{ij} \sigma_i \sigma_j\right) &= \left\lbrace\begin{array}{lr}
+        \exp(\beta J_{ij}) &\text{if } \sigma_i = \sigma_j\\
+        \exp(-\beta J_{ij}) &\text{otherwise}\\
+      \end{array}\right\rbrace \\
+      &= \exp(\beta J_{ij})\delta_{\sigma_i\sigma_j} + \exp(-\beta J_{ij})\delta_{\sigma_i, -\sigma_j} \\
+      &= \exp(\beta J_{ij})\left\lbrack\delta_{\sigma_i\sigma_j} + \exp(-2\beta J_{ij})\delta_{\sigma_i, -\sigma_j}\right\rbrack \\
+      &= \exp(\beta J_{ij})\left\lbrack\delta_{\sigma_i\sigma_j} + \exp(-2\beta J_{ij})(1 - \delta_{\sigma_i\sigma_j})\right\rbrack \\
+      &= \exp(\beta J_{ij})\left\lbrack\exp(-2\beta J_{ij}) + (1 - \exp(-2\beta J_{ij}))\delta_{\sigma_i\sigma_j}\right\rbrack \\
+\end{aligned}
+$$
+
+Let $p_{ij} = 1 - \exp(-2\beta J_{ij})$, the partition function is then:
+
+$$
+\begin{aligned}
+  Z &= \sum_{\mathbf{\sigma}}\left\lbrack \prod_{i,j} \left\lbrace \exp(\beta J_{ij})\left\lbrack(1 - p_{ij}) + p_{ij}\delta_{\sigma_i\sigma_j}\right\rbrack\right\rbrace\right\rbrack \\
+\end{aligned}
+$$
+
+Next we introduct binary "bond" variables $b_{ij} = 0, 1$ which indicate whether
+the spins are aligned or not:
+
+$$
+\begin{aligned}
+  Z &= \sum_{\mathbf{\sigma}} \prod_{i,j} \sum_{b_{ij}}\left\lbrace \exp(\beta J_{ij})\left\lbrack(1 - p_{ij})\delta_{b_{ij}, 0} + p_{ij}\delta_{\sigma_i\sigma_j}\delta_{b_{ij},1}\right\rbrack\right\rbrace \\
+    &= \sum_{\mathbf{\sigma}} \prod_{i,j} \sum_{b_{ij}}W(\sigma_i, \sigma_j, b_{ij}) \\
+\end{aligned}
+$$
+
+It is clear that performing the sum over $b_{ij}$ recovers the same expression as above.
+While local Monte-Carlo updates like Metropolis or Gibbs/heat-bath sample from $p(\mathbf{\sigma})$,
+Swendsen-Wang/Wolff sample the joint distribution $p(\mathbf{\sigma}, \lbrace b_{ij}\rbrace)$.
+
+\newpage
+
+# The Swendsen-Wang Algorithm
+
+The Swendsen-Wang algorithm is a cluster update algorithm based on the Fortuin-Kastelyn
+representation of the partition function. The update procedure is:
+
+1. For all pairs of spins $(\sigma_i, \sigma_j)$, set $b_{ij} = 1$ with probability
+   $P_{ij} = p_{ij} \delta_{\sigma_i\sigma_j}$. This is usually done by first checking
+   whether the spins are aligned, and then setting $b_{ij} = 1$ with probability
+   $p_{ij} = 1 - \exp(-2\beta J_{ij})$.
+2. Inspect $\lbrace b_{ij}\rbrace$ to identify clusters of spins
+3. Flip clusters independently with probability $\frac{1}{2}$.
+
+In the case of nearest-neighbor interactions, each Monte-Carlo step takes $O(N)$ time,
+where $N$ is the number of spins. However, in the case of long-range interactions,
+the first part would end up taking $O(N^2)$ time.
+
+# The Luijten-Bl&ouml;te Algorithm
+
+<!-- Noticed that $P_{ij} = p_{ij} \delta_{\sigma_i\sigma_j} = p(b_{ij} = 1 | \sigma_i, \sigma_j) = p(b_{ij} = 1 | \sigma_i = \sigma_j) p(\sigma_i = \sigma_j | \sigma_i, \sigma_j)$ -->
+
+In the Swendsen-Wang we check that $\sigma_i = \sigma_j$ first, and then sample
+$b_{ij} \sim \text{Bernoulli}(p_{ij})$. Luijten and Bl&ouml;te proposed doing
+this in reverse, that is, sample the candidate bonds first, and then activate the
+candidate bonds based on whether the spins are aligned. This could potentially
+speed up the first step of the SW procedure, since we'd no longer have to
+iterate through every pair of spins.
+
+To show that we will indeed need to iterate over significantly fewer bonds,
+we compute the expected number of candidate bonds for a $d$-dimensional Ising Model:
+
+$$
+\begin{aligned}
+  \sum_{ij} p_{ij} &= \sum_{ij} (1 - \exp(-2\beta J_{ij})) \\
+  &\sim \sum_i \int_1^{N^{1/d}} r^{d-1} (1 - \exp(-2\beta J(r))) dr \\
+  &= N \int_1^{N^{1/d}} r^{d-1} (1 - \exp(-2\beta J(r))) dr \\
+  &\sim 2\beta N \int_1^{N^{1/d}} r^{d-1} J(r) dr \\
+\end{aligned}
+$$
+
+In the second line we assumed that the interaction strength depended only on the
+distance between the two sites, and in the third we assumed translational invariance.
+In the last line we Taylor expanded the exponential, assuming that $J(r)$ is small.
+The integral converges to a finite constant as $N\rightarrow \infty$ provided
+that $J(r)$ decays faster that $r^{-d}$. Hence, the expected number of candidate
+bonds scales as $O(N)$. \cite{lb, ft}
+
+The Luijten-Bl&ouml;te algorithm gives a way to sample the candidate bonds. We begin
+by enumerating all possible bonds as $m = 1, 2, \ldots, N_b$.
+$$p_m = 1 - \exp(-2\beta J_m)$$
+
+where $J_m$ is the interaction strength of the $m$th bond.
+Define the distribution:
+$$ q_m^{(0)} = p_m \prod_{l=1}^{m-1}(1 - p_l) $$
+
+which is the probability that the $m$th bond is chosen after the first $m-1$
+bonds were rejected. After the $m$th bond is sampled from $q^{(0)}$, we then sample
+$n$ from
+$$ q_n^{(m)} = p_n \prod_{l=m+1}^{n-1}(1 - p_l) $$
+and repeat until we've considered all possible candidate bonds.
+
+Naively, we'd expect that we'd need to build $N_b \sim N^2$ different
+distributions $q_n^{(m)}$, each of which is a vector of size at most $N_b$.
+This would require $O(N_b^2) = O(N^4)$ memory. However, we can use the fact that
+$q_n^{(m)}$ can be easily constructed from $q_m^{(0)}$. Consider the cumulative
+distributions: $C_m^{(0)} = \sum_{l=1}^m q_l^{(0)}$ and $C_n^{(m)} = \sum_{l=m+1}^n q_l^{(m)}$
+
+Observe:
+
+$$
+\begin{aligned}
+  C_n^{(0)} - C_m^{(0)} &= \sum_{l=1}^n q_l^{(0)} - \sum_{l=1}^m q_l^{(0)}
+  = \sum_{l=m+1}^n q_l^{(0)}
+  = \sum_{l=m+1}^n p_l \prod_{i=1}^{l-1} (1 - p_i) \\
+  &= \sum_{l=m+1}^n p_l \prod_{i=m+1}^{l-1} (1 - p_i) \prod_{i=1}^{m} (1 - p_i) \\
+  &= \sum_{l=m+1}^n q_l^{(m)} \prod_{i=1}^{m} (1 - p_i) \\
+  &= \sum_{l=m+1}^n q_l^{(m)} \frac{q_{m+1}^{(0)}}{p_{m+1}} \\
+  &= C_n^{(m)} \frac{q_{m+1}^{(0)}}{p_{m+1}} \\
+  \implies C_n^{(m)} &= \frac{p_{m+1}}{q_{m+1}^{(0)}} \left(C_n^{(0)} - C_m^{(0)}\right) \\
+\end{aligned}
+$$
+
+Note that there's a typo in the indices of the above expression in the Fukui-Todo paper.
+The above identity allows us to avoid having to store every $q_n^{(m)}$ and it's CDF.
+We can hence sample from $C_n^{(m)}$ easily by transforming the random variable.
+
+## How to sample from a finite discrete distribution
+
+Given a probability mass function $$p: \{1, \ldots, M\} \mapsto [0, 1]$$
+In order to draw samples according to this distribution, we first need to compute
+the cumulative distribution $F$, which is just the cumulative sum of $\{p_i\}$
+(this takes $O(M)$ time and space, but we only need to compute it once).
+
+To sample from $p$, we draw $u \sim U[0,1]$, and then find $m$ such that
+$$F_{m-1}\leq u \le F_m$$
+
+Naively searching through $F$ for such an $m$ would take linear time. However,
+we can accelerate this process by using a binary search, giving $O(\log M)$ time!
+
+We may use this procedure directly to draw a sample from $q_n^{(m)}$ using its
+CDF $C_n^{(m)}$ when $m=0$. In order to sample from the distributions where $m \neq 0$,
+we draw $u \sim U[0, 1]$ and find $n$ such that
+
+$$
+\begin{aligned}
+  C_{n-1}^{(m)} &\leq \quad\qquad u &&\le C_{n}^{(m)} \\
+  \frac{p_{m+1}}{q_{m+1}^{(0)}}\left(C_{n-1}^{(0)} - C_m^{(0)}\right) &\leq \quad\qquad u &&\le \frac{p_{m+1}}{q_{m+1}^{(0)}}\left(C_{n}^{(0)} - C_m^{(0)}\right) \\
+  C_{n-1}^{(0)} &\leq C_m^{(0)} - \frac{q_{m+1}^{(0)}}{p_{m+1}}u &&\le C_{n}^{(0)} \\
+\end{aligned}
+$$
+
+So we just need to sample $u \sim U[0, 1]$, apply the above transformation, and then
+use the transformed random variable as the input of the binary search.
+
+The Luijten-Bl&ouml;te algorithm will perform one search per candidate bond. Hence,
+the expected run-time of one MC step will be $O(N\log N)$ in the case where $J(r)$ decays
+faster than $r^{-d}$.
+
+
+# Fukui-Todo algorithm
+
+Main idea: Use the
