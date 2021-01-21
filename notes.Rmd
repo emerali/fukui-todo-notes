@@ -151,7 +151,8 @@ To sample from $p$, we draw $u \sim U[0,1]$, and then find $m$ such that
 $$F_{m-1}\leq u \le F_m$$
 
 Naively searching through $F$ for such an $m$ would take linear time. However,
-we can accelerate this process by using a binary search, giving $O(\log M)$ time!
+we can accelerate this process by using a binary search, giving $O(\log M)$ time
+per sample!
 
 We may use this procedure directly to draw a sample from $q_n^{(m)}$ using its
 CDF $C_n^{(m)}$ when $m=0$. In order to sample from the distributions where $m \neq 0$,
@@ -175,4 +176,127 @@ faster than $r^{-d}$.
 
 # Fukui-Todo algorithm
 
-Main idea: Use the
+We begin by extending the Fortuin-Kastelyn representation of the partition function.
+Replacing the binary bond variables $b_{ij} = 0,1$ with $k_{ij} = 0,1,2,\ldots$
+such that $P(b_{ij} = 0 | \sigma_i = \sigma_j) = P(k_{ij} = 0 | \sigma_i = \sigma_j)$
+and $P(b_{ij} = 1 | \sigma_i = \sigma_j) = P(k_{ij} > 0 | \sigma_i = \sigma_j)$.
+Demanding that $k_{ij}$ be a Poisson random variable satisfies all the desired
+properties.
+
+Recall the Poisson distribution with mean $\lambda$:
+$$f(k ; \lambda) = \frac{e^{-\lambda}}{k!}\lambda^k$$
+Considering all bonds $k_{ij} > 0$ as "activated", gives:
+$$
+P(k_{ij} > 0 | \sigma_i = \sigma_j) = \sum_{k_{ij} = 1}^\infty f(k_{ij} ; \lambda) = 1 - \exp(-\lambda)
+$$
+
+Hence we define $\lambda_{ij} = 2\beta J_{ij}$. This yields the extended
+Fortuin-Kastelyn representation of the partition function:
+$$
+Z = \sum_{\mathbf{\sigma}} \prod_{i,j} \sum_{k_{ij}=0}^\infty
+\frac{\exp(-2\beta J_{ij})}{k_{ij}!}(2\beta J_{ij})^{k_{ij}}
+\left( \delta_{k_{ij},0} + (1 - \delta_{k_{ij}, 0})\delta_{\sigma_i,\sigma_j}\right) \\
+$$
+
+As an aside, this representation allows us to derive new estimators for
+certain quantities, such as the energy and specific heat:
+
+$$E = \sum_{l} J_l - \frac{1}{\beta}\left\langle \sum_l k_l\right\rangle_{MC}$$
+
+$$
+C = \frac{1}{N}\left\lbrack
+\left\langle \left(\sum_l k_l\right)^2\right\rangle_{MC}
+- \left\langle \sum_l k_l\right\rangle_{MC}^2
+- \left\langle \sum_l k_l\right\rangle_{MC}
+\right\rbrack
+$$
+
+An interesting feature of these estimators is that one does not need to iterate
+over all bonds, just the ones that are active at each MC step, which reduces
+the runtime from $O(N_b)$ to $O(N)$ for $J(r)$ decaying faster than $r^{-d}$.
+Note that in the expectations above, $\sum_l k_l \neq k_t$ as we've coupled
+$k_{ij}$ with the spin variables.
+
+Generating a Poisson random variable
+for each bond gives us an alternative, but equivalent, method of activating bonds
+between parallel spins. However, generating a sample from a Poisson distribution
+takes $O(\lambda)$ time, so it is of course not practical to generate a Poisson
+variable for each candidate bond separately. Instead, we will use the properties of
+the Poisson distribution to combine all of these bond variables into one, reducing
+the number of Poisson random samples to just one per MC step.
+
+Consider the joint probability of $N_b$ bond variables $k_l$ where $l$ is the
+bond index:
+
+$$
+\begin{aligned}
+  \prod_{l=1}^{N_b} f(k_l; \lambda_l)
+  &= f(k_t; \lambda_t) (k_t!) \prod_{l=1}^{N_b} \frac{1}{k_l!}\left(\frac{\lambda_l}{\lambda_t}\right)^{k_l}
+\end{aligned}
+$$
+
+where $\lambda_t = \sum_l \lambda_l = 2\beta\sum_l J_l$ and $k_t = \sum_l k_l$.
+The right-hand side of the above expression is the probability of sampling the
+Poisson random variable $k_t$ with mean $\lambda_t$ times the probability of
+sampling $\{k_l\}_l$ from a multinomial distribution with $k_t$ trials and
+category probabilities given by $\{\lambda_l/\lambda_t\}_l$.
+
+The first part of each Monte Carlo step is now:
+
+a. Initialize all bonds $k_{ij} = 0$
+
+b. Draw $k_t \sim \text{Poisson}(\lambda_t)$
+
+c. Repeat $k_t$ times: Sample a bond $l = (i, j)$ from
+     $p_l = \lambda_l/\lambda_t = J_l / \sum_l J_l$. If $\sigma_i = \sigma_j$,
+     increment $k_{ij}$ by one.
+
+After this, proceed just like the regular Swendsen-Wang procedure: identify
+all clusters, then flip them independently with probability $\frac{1}{2}$.
+The time complexity of step b is $O(\lambda_t) \sim O(\beta \sum_{ij} J)$ which for
+Ising Models with $J(r)$ decaying faster than $r^{-d}$ is $O(\beta N)$.
+The time complexity of step c is dependent on how we choose to sample
+from the distribution $p_l$. Using the fastest method discussed so far (binary
+search), we'll need $O(\log N_b) \sim O(\log N^2) \sim O(\log N)$ time. This is
+hardly an improvement over the Luijten-Bl&ouml;te algorithm. However, there exist
+even *faster* methods to sample from a discrete probability distribution. In
+fact, a method exists which allows us to do so in constant time!
+
+# Walker's Alias Method
+
+Given a probability distribution with $M$ events, the main idea behind the Alias
+Method is to define M bins with height equal to 1, and then assign each
+bin a cut-off probability $c_i \in [0,1]$, along with an "alias"
+$a_i \in \{1,2,\ldots,M\}$. To sample from such a structure, we
+generate 2 uniform random variables:
+$$i \sim U\{1,2,\ldots,M\} \qquad u \sim U[0, 1]$$
+
+If $u < c_i$, we return $i$, otherwise we return $a_i$.
+It is obvious that such a sampling procedure would take constant time.
+
+> Aside: depending on how fast the Pseudo-Random Number Generator is, it may be
+beneficial to generate $i$ and $u$ from a single random number:
+$$x \sim U[0, 1]$$
+$$\implies i = \lfloor Mx\rfloor + 1 \qquad u = Mx - i + 1$$
+
+Now, we will discuss how to build such an alias table (i.e. both the cut-off and
+alias arrays). First, we note that the alias table is not unique (this can
+be seen by parameter counting). Walker's original paper \cite{walker77} gave an
+initialization algorithm which took $O(M^2)$ time, though this could have easily
+been reduced to $O(M\log M)$ had he used a better intermediate data structure
+(say, a heap).
+
+However, Vose \cite{vose91} gave a simple method to construct the alias table in
+$O(M)$ time.
+
+...
+
+
+
+Note: oftentimes the distribution is only initialized once, but is used to
+generate many samples, so the runtime of the initialization step may not be too
+important.
+
+> Aside: If we wanted to further optimize the sampling step, we must construct
+an alias table which minimize the frequency of indexing the alias array. Doing
+this, however, is NP-Hard \cite{tsang81, marsaglia87}.
