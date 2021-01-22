@@ -1,3 +1,9 @@
+---
+bibliography: ["refs.bib"]
+biblio-style: "unsrt"
+link-citations: true
+---
+
 # The Fortuin-Kastelyn Representation
 
 Consider a classical Ising Model of $N$ spins:
@@ -35,7 +41,7 @@ Let $p_{ij} = 1 - \exp(-2\beta J_{ij})$, the partition function is then:
 
 $$
 \begin{aligned}
-  Z &= \sum_{\mathbf{\sigma}}\left\lbrack \prod_{i,j} \left\lbrace \exp(\beta J_{ij})\left\lbrack(1 - p_{ij}) + p_{ij}\delta_{\sigma_i\sigma_j}\right\rbrack\right\rbrace\right\rbrack \\
+  Z &= \sum_{\mathbf{\sigma}} \prod_{i,j} \exp(\beta J_{ij})\left\lbrack(1 - p_{ij}) + p_{ij}\delta_{\sigma_i\sigma_j}\right\rbrack \\
 \end{aligned}
 $$
 
@@ -44,7 +50,7 @@ the spins are aligned or not:
 
 $$
 \begin{aligned}
-  Z &= \sum_{\mathbf{\sigma}} \prod_{i,j} \sum_{b_{ij}}\left\lbrace \exp(\beta J_{ij})\left\lbrack(1 - p_{ij})\delta_{b_{ij}, 0} + p_{ij}\delta_{\sigma_i\sigma_j}\delta_{b_{ij},1}\right\rbrack\right\rbrace \\
+  Z &= \sum_{\mathbf{\sigma}} \prod_{i,j} \sum_{b_{ij}} \exp(\beta J_{ij})\left\lbrack(1 - p_{ij})\delta_{b_{ij}, 0} + p_{ij}\delta_{\sigma_i\sigma_j}\delta_{b_{ij},1}\right\rbrack \\
     &= \sum_{\mathbf{\sigma}} \prod_{i,j} \sum_{b_{ij}}W(\sigma_i, \sigma_j, b_{ij}) \\
 \end{aligned}
 $$
@@ -73,8 +79,6 @@ the first part would end up taking $O(N^2)$ time.
 
 # The Luijten-Bl&ouml;te Algorithm
 
-<!-- Noticed that $P_{ij} = p_{ij} \delta_{\sigma_i\sigma_j} = p(b_{ij} = 1 | \sigma_i, \sigma_j) = p(b_{ij} = 1 | \sigma_i = \sigma_j) p(\sigma_i = \sigma_j | \sigma_i, \sigma_j)$ -->
-
 In the Swendsen-Wang we check that $\sigma_i = \sigma_j$ first, and then sample
 $b_{ij} \sim \text{Bernoulli}(p_{ij})$. Luijten and Bl&ouml;te proposed doing
 this in reverse, that is, sample the candidate bonds first, and then activate the
@@ -98,8 +102,9 @@ In the second line we assumed that the interaction strength depended only on the
 distance between the two sites, and in the third we assumed translational invariance.
 In the last line we Taylor expanded the exponential, assuming that $J(r)$ is small.
 The integral converges to a finite constant as $N\rightarrow \infty$ provided
-that $J(r)$ decays faster that $r^{-d}$. Hence, the expected number of candidate
-bonds scales as $O(N)$. \cite{lb, ft}
+that $J(r)$ decays faster that $r^{-d}$. This condition is essentially demanding
+that the energy density of the Ising Model stays finite in the thermodynamic
+limit. The expected number of candidate bonds scales as $O(N)$ \cite{lb, ft}.
 
 The Luijten-Bl&ouml;te algorithm gives a way to sample the candidate bonds. We begin
 by enumerating all possible bonds as $m = 1, 2, \ldots, N_b$.
@@ -136,7 +141,8 @@ $$
 \end{aligned}
 $$
 
-Note that there's a typo in the indices of the above expression in the Fukui-Todo paper.
+Note that there's a typo in the indices of the above expression in the arXiv version of
+the Fukui-Todo paper \cite{ft}; the Flores-Sola paper writes it correctly \cite{flores_sola}.
 The above identity allows us to avoid having to store every $q_n^{(m)}$ and it's CDF.
 We can hence sample from $C_n^{(m)}$ easily by transforming the random variable.
 
@@ -148,7 +154,7 @@ the cumulative distribution $F$, which is just the cumulative sum of $\{p_i\}$
 (this takes $O(M)$ time and space, but we only need to compute it once).
 
 To sample from $p$, we draw $u \sim U[0,1]$, and then find $m$ such that
-$$F_{m-1}\leq u \lt F_m$$
+$$F_{m-1}\leq u < F_m$$
 
 Naively searching through $F$ for such an $m$ would take linear time. However,
 we can accelerate this process by using a binary search, giving $O(\log M)$ time
@@ -193,14 +199,52 @@ $$
 Hence we define $\lambda_{ij} = 2\beta J_{ij}$. This yields the extended
 Fortuin-Kastelyn representation of the partition function:
 $$
-Z = \sum_{\mathbf{\sigma}} \prod_{i,j} \sum_{k_{ij}=0}^\infty
-\frac{\exp(-2\beta J_{ij})}{k_{ij}!}(2\beta J_{ij})^{k_{ij}}
+\begin{aligned}
+Z &= \sum_{\mathbf{\sigma}} \prod_{i,j} \sum_{k_{ij}=0}^\infty
+\frac{\exp(-\beta J_{ij})}{k_{ij}!}(2\beta J_{ij})^{k_{ij}}
 \left( \delta_{k_{ij},0} + (1 - \delta_{k_{ij}, 0})\delta_{\sigma_i,\sigma_j}\right) \\
+&= \sum_{\mathbf{\sigma}} \prod_{i,j}
+\left\lbrack
+  \exp(-\beta J_{ij})\sum_{k_{ij}=0}^\infty
+  \frac{1}{k_{ij}!}(2\beta J_{ij})^{k_{ij}}
+  \delta_{k_{ij},0}
+  +
+  \exp(-\beta J_{ij})\sum_{k_{ij}=0}^\infty
+  \frac{1}{k_{ij}!}(2\beta J_{ij})^{k_{ij}}
+  (1 - \delta_{k_{ij}, 0})\delta_{\sigma_i,\sigma_j}
+\right\rbrack \\
+&= \sum_{\mathbf{\sigma}} \prod_{i,j}
+\left\lbrack
+  \exp(-\beta J_{ij})\cdot 1
+  +
+  \exp(-\beta J_{ij})\delta_{\sigma_i,\sigma_j}\sum_{k_{ij}=1}^\infty
+  \frac{1}{k_{ij}!}(2\beta J_{ij})^{k_{ij}}
+\right\rbrack \\
+&= \sum_{\mathbf{\sigma}} \prod_{i,j}
+\left\lbrack
+  \exp(-\beta J_{ij})
+  +
+  \exp(-\beta J_{ij})
+  (\exp(2\beta J_{ij}) - 1)\delta_{\sigma_i,\sigma_j}
+\right\rbrack \\
+&= \sum_{\mathbf{\sigma}} \prod_{i,j} \exp(\beta J_{ij})
+\left\lbrack
+  \exp(-2\beta J_{ij})
+  +
+  (1 - \exp(-2\beta J_{ij}))\delta_{\sigma_i,\sigma_j}
+\right\rbrack \\
+&= \sum_{\mathbf{\sigma}} \prod_{i,j} \exp(\beta J_{ij})
+\left\lbrack
+  (1 - p_{ij}) + p_{ij}\delta_{\sigma_i,\sigma_j}
+\right\rbrack \\
+\end{aligned}
 $$
-
-As an aside, this representation allows us to derive new estimators for
-certain quantities, such as the energy and specific heat:
-
+and we see that it is indeed equivalent to the representation we derived earlier.
+Note that there is a typo in the expression of the above representation in
+\cite{flores_sola}; the exponential in the sum should be $\exp(-\beta J_{ij})$,
+not $\exp(-2\beta J_{ij})$
+As an aside, taking the proper derivatives in this representation allows us to
+derive new estimators for certain quantities, such as the energy and specific heat:
 $$E = \sum_{l} J_l - \frac{1}{\beta}\left\langle \sum_l k_l\right\rangle_{MC}$$
 
 $$
@@ -232,7 +276,10 @@ bond index:
 $$
 \begin{aligned}
   \prod_{l=1}^{N_b} f(k_l; \lambda_l)
-  &= f(k_t; \lambda_t) (k_t!) \prod_{l=1}^{N_b} \frac{1}{k_l!}\left(\frac{\lambda_l}{\lambda_t}\right)^{k_l}
+  &= f(k_t; \lambda_t)
+  \left\lbrack
+    (k_t!) \prod_{l=1}^{N_b} \frac{1}{k_l!}\left(\frac{\lambda_l}{\lambda_t}\right)^{k_l}
+  \right\rbrack
 \end{aligned}
 $$
 
@@ -290,14 +337,25 @@ been reduced to $O(M\log M)$ had he used a better intermediate data structure
 However, Vose \cite{vose91} gave a simple method to construct the alias table in
 $O(M)$ time.
 
-...
+### How to build an alias table
 
+Basic Idea:
 
+- Compute the "average probability" (i.e. $1/M$)
+- Pick one bin that is "over-filled" ($p_i > 1/M$) and one that is "under-filled" ($p_j < 1/M$)
+  - if an over-filled bin exists, there *must* be an under-filled bin
+- Take as much probability mass from the over-filled bin, $i$, as necessary is to "fill" the underfull bin, $j$
+  - set alias of $j$ to $i$, and cut-off of bin $j$ to be it's probability mass before the weight transfer
+- The over-filled bin may now be under-filled (that's ok!)
+- The under-filled bin should now be exactly filled
+- Repeat until all bins are exactly filled
 
 Note: oftentimes the distribution is only initialized once, but is used to
 generate many samples, so the runtime of the initialization step may not be too
-important.
+important. See the page by Keith Schwarz \cite{schwarz} for a more detailed
+tutorial on the Alias Method.
+
 
 > Aside: If we wanted to further optimize the sampling step, we must construct
-an alias table which minimize the frequency of indexing the alias array. Doing
-this, however, is NP-Hard \cite{tsang81, marsaglia87}.
+an alias table which minimizes the frequency of indexing the alias array. Doing
+this, however, is NP-Hard \cite{marsaglia2004}.

@@ -129,7 +129,7 @@ The new bond variable $k_{ij}$ must follow a Poisson distribution with mean $\la
 This yields the extended Fortuin-Kastelyn representation of the partition function:
 $$
 Z = \sum_{\mathbf{\sigma}} \prod_{i,j} \sum_{k_{ij}=0}^\infty
-\frac{\exp(-2\beta J_{ij})}{k_{ij}!}(2\beta J_{ij})^{k_{ij}}
+\frac{\exp(-\beta J_{ij})}{k_{ij}!}(2\beta J_{ij})^{k_{ij}}
 \left( \delta_{k_{ij},0} + (1 - \delta_{k_{ij}, 0})\delta_{\sigma_i,\sigma_j}\right)
 $$
 
