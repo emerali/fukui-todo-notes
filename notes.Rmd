@@ -148,7 +148,7 @@ the cumulative distribution $F$, which is just the cumulative sum of $\{p_i\}$
 (this takes $O(M)$ time and space, but we only need to compute it once).
 
 To sample from $p$, we draw $u \sim U[0,1]$, and then find $m$ such that
-$$F_{m-1}\leq u \le F_m$$
+$$F_{m-1}\leq u \lt F_m$$
 
 Naively searching through $F$ for such an $m$ would take linear time. However,
 we can accelerate this process by using a binary search, giving $O(\log M)$ time
@@ -214,14 +214,15 @@ $$
 An interesting feature of these estimators is that one does not need to iterate
 over all bonds, just the ones that are active at each MC step, which reduces
 the runtime from $O(N_b)$ to $O(N)$ for $J(r)$ decaying faster than $r^{-d}$.
-Note that in the expectations above, $\sum_l k_l \neq k_t$ as we've coupled
-$k_{ij}$ with the spin variables.
+Note that in the expectations above, $k_{ij}$ have been coupled with the
+spin variables, so we can't treat them as Poisson RVs and evaluate the
+expectations analytically.
 
 Generating a Poisson random variable
 for each bond gives us an alternative, but equivalent, method of activating bonds
 between parallel spins. However, generating a sample from a Poisson distribution
-takes $O(\lambda)$ time, so it is of course not practical to generate a Poisson
-variable for each candidate bond separately. Instead, we will use the properties of
+for each candidate bond separately would generate a lot of overhead.
+Instead, we will use the properties of
 the Poisson distribution to combine all of these bond variables into one, reducing
 the number of Poisson random samples to just one per MC step.
 
